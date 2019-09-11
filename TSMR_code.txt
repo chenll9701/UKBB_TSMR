@@ -1,0 +1,50 @@
+id <- c(1090,23,24,25,26,976,'UKB-a:306','UKB-a:74','UKB-a:75',
+		'UKB-b:10753','UKB-b:11293','UKB-b:12948','UKB-b:13806',
+		'UKB-b:8313','UKB-b:8972')
+setwd('C:\\Users\\86151\\Documents\\my publications\\GWAS_nap\\GWAS_nap')
+library(TwoSampleMR)
+nap_exp_dat <- read_exposure_data(
+    filename = 'nap_exp.csv',
+    sep = ",",
+    snp_col = "SNP",
+    beta_col = "beta",
+    se_col = "se",
+    effect_allele_col = "effect_allele",
+    other_allele_col = "other_allele",
+    eaf_col = "eaf",
+    pval_col = "pval"
+)
+nap_exp_dat <- clump_data(nap_exp_dat)
+out_dat <- extract_outcome_data(snps=nap_exp_dat$SNP,outcomes=id[1], access_token=NULL)
+dat <- harmonise_data(
+    exposure_dat = nap_exp_dat, 
+    outcome_dat = out_dat
+)
+dat <- dat[which(dat$pval.outcome > 0.05/dim(dat)[1]),]
+res <- mr(dat,method_list=c('mr_egger_regression','mr_weighted_median','mr_ivw'))
+het <- mr_heterogeneity(dat, method_list=c('mr_egger_regression','mr_weighted_median','mr_ivw'))
+plei <- mr_pleiotropy_test(dat)
+res <- merge(res, het, all=T)
+res <- merge(res, plei, all=T)
+
+for ( i in 2:length(id)) {
+	dm_out_dat <- extract_outcome_data(
+		snps = nap_exp_dat$SNP,
+		outcomes = id[i], access_token=NULL)
+	if ( !is.null(dm_out_dat)) {
+		dm_dat <- harmonise_data(
+			exposure_dat = nap_exp_dat,
+			outcome_dat = dm_out_dat)
+		dm_dat <- dm_dat[which(dm_dat$pval.outcome > 0.05/dim(dm_dat)[1]),]
+		dm_res <- mr(dm_dat, method_list=c('mr_egger_regression','mr_weighted_median','mr_ivw'))
+		dm_het <- mr_heterogeneity(dm_dat, method_list=c('mr_egger_regression','mr_weighted_median','mr_ivw'))
+		dm_plei <- mr_pleiotropy_test(dm_dat)
+		dm_res <- merge(dm_res, dm_het, all=T)
+		dm_res <- merge(dm_res, dm_plei, all=T)
+		res <- rbind(res, dm_res)
+		}
+	write.csv(res, 'dm_TSMR.csv')
+	}
+	
+	
+	
